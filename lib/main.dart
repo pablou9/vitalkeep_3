@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,6 +32,176 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _selectedIndex = 0;
+  bool isBLEConnected = false;
+  bool isGPSActive = false;
+  Timer? _timer;
+
+  // Variables para estadísticas
+  String heartRate = '0';
+  String steps = '0';
+  String temperature = '0.0';
+  String oxygen = '0';
+
+  // Notificaciones
+  int notificationCount = 0;
+  List<String> notifications = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedData();
+    _startDataUpdates();
+    _checkConnections();
+  }
+
+  // Cargar datos guardados
+  Future<void> _loadSavedData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      steps = prefs.getString('steps') ?? '0';
+      // Cargar otros datos guardados...
+    });
+  }
+
+  // Guardar datos
+  Future<void> _saveData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('steps', steps);
+    // Guardar otros datos...
+  }
+
+  // Simulación de actualizaciones periódicas
+  void _startDataUpdates() {
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _updateHealthData();
+    });
+  }
+
+  // Actualizar datos de salud (simulado)
+  void _updateHealthData() {
+    setState(() {
+      // Simulación de datos actualizados
+      heartRate = (60 + DateTime.now().second % 40).toString();
+      int currentSteps = int.parse(steps);
+      currentSteps += 10;
+      steps = currentSteps.toString();
+      temperature =
+          (36.0 + (DateTime.now().minute % 15) / 10).toStringAsFixed(1);
+      oxygen = (95 + DateTime.now().second % 5).toString();
+
+      _saveData(); // Guardar datos actualizados
+    });
+  }
+
+  // Verificar conexiones
+  Future<void> _checkConnections() async {
+    // Aquí irían las verificaciones reales de BLE y GPS
+    setState(() {
+      isBLEConnected = true; // Simulado
+      isGPSActive = true; // Simulado
+    });
+  }
+
+  // Manejar notificaciones
+  void _addNotification(String message) {
+    setState(() {
+      notifications.insert(0, message);
+      notificationCount++;
+    });
+  }
+
+  void _showNotifications(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Notificaciones'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(notifications[index]),
+                  leading: const Icon(Icons.notification_important),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  notifications.clear();
+                  notificationCount = 0;
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('Limpiar todo'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Mostrar configuración
+  void _showSettings(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Configuración'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: [
+                SwitchListTile(
+                  title: const Text('Notificaciones'),
+                  value: true, // Conectar con preferencias reales
+                  onChanged: (bool value) {
+                    // Implementar cambio de configuración
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('Modo oscuro'),
+                  value: false, // Conectar con preferencias reales
+                  onChanged: (bool value) {
+                    // Implementar cambio de tema
+                  },
+                ),
+                // Más opciones de configuración...
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Actualizar datos manualmente
+  Future<void> _refreshData() async {
+    _addNotification('Actualizando datos...');
+    await _checkConnections();
+    _updateHealthData();
+    _addNotification('Datos actualizados correctamente');
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,13 +210,41 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications),
-            onPressed: () {},
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                onPressed: () => _showNotifications(context),
+              ),
+              if (notificationCount > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
+                    ),
+                    child: Text(
+                      '$notificationCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {},
+            onPressed: () => _showSettings(context),
           ),
         ],
       ),
@@ -53,7 +253,6 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tarjeta de Estado
             Card(
               elevation: 4,
               child: Padding(
@@ -72,23 +271,21 @@ class _MyHomePageState extends State<MyHomePage> {
                     StatusRow(
                       icon: Icons.bluetooth,
                       label: 'Conexión BLE',
-                      status: 'Conectado',
-                      isActive: true,
+                      status: isBLEConnected ? 'Conectado' : 'Desconectado',
+                      isActive: isBLEConnected,
                     ),
                     const Divider(),
                     StatusRow(
                       icon: Icons.location_on,
                       label: 'GPS',
-                      status: 'Activo',
-                      isActive: true,
+                      status: isGPSActive ? 'Activo' : 'Inactivo',
+                      isActive: isGPSActive,
                     ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
-
-            // Sección de Estadísticas
             const Text(
               'Estadísticas',
               style: TextStyle(
@@ -102,7 +299,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 Expanded(
                   child: StatsCard(
                     title: 'Ritmo Cardíaco',
-                    value: '72',
+                    value: heartRate,
                     unit: 'BPM',
                     icon: Icons.favorite,
                     color: Colors.red,
@@ -112,7 +309,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 Expanded(
                   child: StatsCard(
                     title: 'Pasos',
-                    value: '8,546',
+                    value: steps,
                     unit: 'pasos',
                     icon: Icons.directions_walk,
                     color: Colors.blue,
@@ -126,7 +323,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 Expanded(
                   child: StatsCard(
                     title: 'Temperatura',
-                    value: '36.5',
+                    value: temperature,
                     unit: '°C',
                     icon: Icons.thermostat,
                     color: Colors.orange,
@@ -136,7 +333,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 Expanded(
                   child: StatsCard(
                     title: 'Oxígeno',
-                    value: '98',
+                    value: oxygen,
                     unit: '%',
                     icon: Icons.air,
                     color: Colors.green,
@@ -152,6 +349,8 @@ class _MyHomePageState extends State<MyHomePage> {
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
+            // Aquí implementarías la navegación real entre páginas
+            _addNotification('Navegando a la sección ${index + 1}');
           });
         },
         items: const [
@@ -170,13 +369,14 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: _refreshData,
         child: const Icon(Icons.refresh),
       ),
     );
   }
 }
 
+// Las clases StatusRow y StatsCard permanecen igual...
 class StatusRow extends StatelessWidget {
   final IconData icon;
   final String label;
